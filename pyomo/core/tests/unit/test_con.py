@@ -486,7 +486,8 @@ class TestSimpleCon(unittest.TestCase):
     def test_dim(self):
         """Test dim method"""
         model = ConcreteModel()
-        model.c = Constraint()
+        model.x = Var()
+        model.c = Constraint(expr=model.x >= 0)
 
         self.assertEqual(model.c.dim(),0)
 
@@ -698,7 +699,7 @@ class TestConList(unittest.TestCase):
     def test_conlist_skip(self):
         model = ConcreteModel()
         model.x = Var()
-        model.c = ConstraintList()
+        model.c = Constraint()
         self.assertTrue(1 not in model.c)
         self.assertEqual(len(model.c), 0)
         model.c.add(Constraint.Skip)
@@ -715,7 +716,7 @@ class TestConList(unittest.TestCase):
         model.B = RangeSet(1,4)
         def f(model, i):
             if i > 4:
-                return ConstraintList.End
+                return Constraint.End
             ans=0
             for j in model.B:
                 ans = ans + model.x[j]
@@ -724,7 +725,7 @@ class TestConList(unittest.TestCase):
             ans = ans >= 0
             return ans
         model.x = Var(model.B, initialize=2)
-        model.c = ConstraintList(rule=f)
+        model.c = Constraint(rule=f)
 
         self.assertEqual(model.c[1](), 8)
         self.assertEqual(model.c[2](), 16)
@@ -736,7 +737,7 @@ class TestConList(unittest.TestCase):
         model.B = RangeSet(1,4)
         def f(model, i):
             if i > 2:
-                return ConstraintList.End
+                return Constraint.End
             i = 2*i - 1
             ans=0
             for j in model.B:
@@ -746,11 +747,12 @@ class TestConList(unittest.TestCase):
             ans = ans >= 0
             return ans
         model.x = Var(model.B, initialize=2)
-        model.c = ConstraintList(rule=f)
+        model.c = Constraint(rule=f)
 
         self.assertEqual(model.c[1](), 8)
         self.assertEqual(len(model.c), 2)
 
+    # Not supported with this revised semantics :(
     def test_rule_option1a(self):
         """Test rule option"""
         model = self.create_model()
@@ -767,12 +769,13 @@ class TestConList(unittest.TestCase):
             ans = ans >= 0
             return ans
         model.x = Var(model.B, initialize=2)
-        model.c = ConstraintList(rule=f)
+        model.c = Constraint(rule=f)
 
         self.assertEqual(model.c[1](), 8)
         self.assertEqual(model.c[2](), 16)
         self.assertEqual(len(model.c), 4)
 
+    # Not supported with this revised semantics :(
     def test_rule_option2a(self):
         """Test rule option"""
         model = self.create_model()
@@ -790,7 +793,7 @@ class TestConList(unittest.TestCase):
             ans = ans >= 0
             return ans
         model.x = Var(model.B, initialize=2)
-        model.c = ConstraintList(rule=f)
+        model.c = Constraint(rule=f)
 
         self.assertEqual(model.c[1](), 8)
         self.assertEqual(len(model.c), 2)
@@ -803,11 +806,11 @@ class TestConList(unittest.TestCase):
             yield model.y <= 0
             yield 2*model.y <= 0
             yield 2*model.y <= 0
-            yield ConstraintList.End
-        model.c = ConstraintList(rule=f)
+            yield Constraint.End
+        model.c = Constraint(rule=f)
         self.assertEqual(len(model.c), 3)
         self.assertEqual(model.c[1](), 2)
-        model.d = ConstraintList(rule=f(model))
+        model.d = Constraint(rule=f(model))
         self.assertEqual(len(model.d), 3)
         self.assertEqual(model.d[1](), 2)
 
@@ -815,28 +818,28 @@ class TestConList(unittest.TestCase):
         """Test rule option"""
         model = self.create_model()
         model.y = Var(initialize=2)
-        model.c = ConstraintList(rule=((i+1)*model.y >= 0 for i in range(3)))
+        model.c = Constraint(rule=((i+1)*model.y >= 0 for i in range(3)))
         self.assertEqual(len(model.c), 3)
         self.assertEqual(model.c[1](), 2)
 
     def test_dim(self):
         """Test dim method"""
         model = self.create_model()
-        model.c = ConstraintList()
+        model.c = Constraint()
 
         self.assertEqual(model.c.dim(),1)
 
     def test_keys(self):
         """Test keys method"""
         model = self.create_model()
-        model.c = ConstraintList()
+        model.c = Constraint()
 
         self.assertEqual(len(list(model.c.keys())),0)
 
     def test_len(self):
         """Test len method"""
         model = self.create_model()
-        model.c = ConstraintList()
+        model.c = Constraint()
 
         self.assertEqual(len(model.c),0)
 
@@ -956,7 +959,10 @@ class MiscConTests(unittest.TestCase):
             tmp.append(i)
         self.assertEqual(len(tmp),0)
 
-    def test_empty_singleton(self):
+    # This test doesn't make sense if we're 
+    # changing the semantics.  Constraint() is no longer an 
+    # unconstructed singleton.
+    def Xtest_empty_singleton(self):
         a = Constraint()
         a.construct()
         #
@@ -1015,7 +1021,10 @@ class MiscConTests(unittest.TestCase):
         self.assertEqual(a.strict_lower, False)
         self.assertEqual(a.strict_upper, False)
 
-    def test_unconstructed_singleton(self):
+    # This test doesn't make sense if we're 
+    # changing the semantics.  Constraint() is no longer an 
+    # unconstructed singleton.
+    def Xtest_unconstructed_singleton(self):
         a = Constraint()
         self.assertEqual(a._constructed, False)
         self.assertEqual(len(a), 0)
@@ -1110,10 +1119,11 @@ class MiscConTests(unittest.TestCase):
         a = m.x <= 0
         if m.x <= 0:
             pass
-        m.c = Constraint()
-        self.assertRaisesRegexp(
-            TypeError, "contains non-constant terms \(variables\) "
-            "appearing in a Boolean context", m.c.set_value, a)
+        try:
+            m.c = Constraint(expr=a)
+            self.fail("Expected exception")
+        except TypeError:
+            pass
 
     def test_tuple_constraint_create(self):
         def rule1(model):

@@ -1456,7 +1456,7 @@ class PrettyPrinter_newStyle(unittest.TestCase):
 
         def cl_rule(model, i):
             if i > 10:
-                return ConstraintList.End
+                return Constraint.End
             return i* model.c >= model.d
 
         def o2_rule(model, i):
@@ -1493,7 +1493,7 @@ class PrettyPrinter_newStyle(unittest.TestCase):
         model.c13a = Constraint(rule=c13a_rule)
         model.c14a = Constraint(rule=c14a_rule)
 
-        model.cl = ConstraintList(rule=cl_rule)
+        model.cl = Constraint(rule=cl_rule)
 
         instance=model.create_instance()
         OUTPUT=open(currdir+"varpprint.out","w")

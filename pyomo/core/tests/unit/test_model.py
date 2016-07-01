@@ -379,7 +379,7 @@ class Test(unittest.TestCase):
                 expr += j*model.x[j]
             return expr == 0
         model.c = Constraint([1,2], rule=c_rule)
-        model.C = ConstraintList()
+        model.C = Constraint()
         model.C.add(model.y[1] == 0)
         model.C.add(model.y[2] == 0)
         #
@@ -405,7 +405,7 @@ class Test(unittest.TestCase):
         model.B.o = ObjectiveList()
         model.B.o.add(model.B.x[1])
         model.B.o.add(model.B.x[2])
-        model.B.c = ConstraintList()
+        model.B.c = Constraint()
         model.B.c.add(model.x[1] == 0)
         model.B.c.add(model.x[2] == 0)
         self.assertEqual(model.nvariables(), 4)

@@ -86,7 +86,7 @@ def simple_constraint_rule( fn ):
 def simple_constraintlist_rule( fn ):
     """
     This is a decorator that translates None/True/False return values
-    into ConstraintList.End/Constraint.Feasible/Constraint.Infeasible.
+    into Constraint.End/Constraint.Feasible/Constraint.Infeasible.
     This supports a simpler syntax in constraint rules, though these can be
     more difficult to debug when errors occur.
 
@@ -119,12 +119,13 @@ def simple_constraintlist_rule( fn ):
         #
         if value.__class__ in _simple_constraint_rule_types:
             if value is None:
-                return ConstraintList.End
+                return Constraint.End
             elif value is True:
                 return Constraint.Feasible
             elif value is False:
                 return Constraint.Infeasible
         return value
+    wrapper_function.constraint_rule = True
     return wrapper_function
 
 
@@ -641,11 +642,23 @@ class Constraint(ActiveIndexedComponent):
     Violated        = (1001,)
     Feasible        = (1002,)
     Satisfied       = (1002,)
+    End             = (1003,)
 
     def __new__(cls, *args, **kwds):
         if cls != Constraint:
             return super(Constraint, cls).__new__(cls)
-        if args == () or (args[0] == UnindexedComponent_set and len(args)==1):
+        if args == ():
+            if 'expr' in kwds:
+                return SimpleConstraint.__new__(SimpleConstraint)
+            if 'rule' in kwds:
+                _init_rule = kwds['rule']
+                if inspect.isgeneratorfunction(_init_rule) or inspect.isgenerator(_init_rule) or _init_rule.__code__.co_argcount > 1 or getattr(_init_rule, 'constraint_rule', False):
+                    return ConstraintList.__new__(ConstraintList)
+                else:
+                    return SimpleConstraint.__new__(SimpleConstraint)
+            else:
+                return ConstraintList.__new__(ConstraintList)
+        if args[0] == UnindexedComponent_set and len(args)==1:
             return SimpleConstraint.__new__(SimpleConstraint)
         else:
             return IndexedConstraint.__new__(IndexedConstraint)
@@ -657,7 +670,6 @@ class Constraint(ActiveIndexedComponent):
         #    raise ValueError("A simple Constraint component requires a 'rule' or 'expr' option")
         kwargs.setdefault('ctype', Constraint)
         ActiveIndexedComponent.__init__(self, *args, **kwargs)
-
 
     def construct(self, data=None):
         """
@@ -1093,8 +1105,6 @@ class ConstraintList(IndexedConstraint):
     added an index value is not specified.
     """
 
-    End             = (1003,)
-
     def __init__(self, **kwargs):
         """Constructor"""
         args = (Set(),)
@@ -1150,9 +1160,9 @@ class ConstraintList(IndexedConstraint):
                 if expr is None:
                     raise ValueError(
                         "Constraint rule returned None "
-                        "instead of ConstraintList.End")
+                        "instead of Constraint.End")
                 if (expr.__class__ is tuple) and \
-                   (expr == ConstraintList.End):
+                   (expr == Constraint.End):
                     return
                 self.add(expr)
 
@@ -1162,9 +1172,9 @@ class ConstraintList(IndexedConstraint):
                 if expr is None:
                     raise ValueError(
                         "Constraint generator returned None "
-                        "instead of ConstraintList.End")
+                        "instead of Constraint.End")
                 if (expr.__class__ is tuple) and \
-                   (expr == ConstraintList.End):
+                   (expr == Constraint.End):
                     return
                 self.add(expr)
 
@@ -1178,4 +1188,3 @@ class ConstraintList(IndexedConstraint):
         return cdata
 
 register_component(Constraint, "General constraint expressions.")
-register_component(ConstraintList, "A list of constraint expressions.")
