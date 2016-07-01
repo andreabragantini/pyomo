@@ -1178,13 +1178,18 @@ class ConstraintList(IndexedConstraint):
                     return
                 self.add(expr)
 
-    def add(self, expr):
+    def add(self, arg, expr=None):
         """Add a constraint with an implicit index."""
-        cdata = self._check_skip_add(self._nconstraints + 1, expr)
         self._nconstraints += 1
-        self._index.add(self._nconstraints)
+        if expr is None:
+            index = self._nconstraints
+            expr = arg
+        else:
+            index = arg
+        cdata = self._check_skip_add(index, expr)
+        self._index.add(index)
         if cdata is not None:
-            self._data[self._nconstraints] = cdata
+            self._data[index] = cdata
         return cdata
 
 register_component(Constraint, "General constraint expressions.")

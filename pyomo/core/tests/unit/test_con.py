@@ -692,6 +692,28 @@ class TestConList(unittest.TestCase):
         model.A = Set(initialize=[1,2,3,4])
         return model
 
+    def test_add(self):
+        model = ConcreteModel()
+        model.x = Var()
+        model.c = Constraint()
+
+        model.c.add(model.x >= 1)
+        self.assertTrue(1 in model.c)
+        self.assertTrue(2 not in model.c)
+        self.assertEqual(len(model.c), 1)
+
+        model.c.add("a", model.x >= 2)
+        self.assertTrue(1 in model.c)
+        self.assertTrue(2 not in model.c)
+        self.assertTrue("a" in model.c)
+        self.assertEqual(len(model.c), 2)
+
+        model.c.add(model.x >= 3)
+        self.assertTrue(1 in model.c)
+        self.assertTrue(3 in model.c)
+        self.assertTrue("a" in model.c)
+        self.assertEqual(len(model.c), 3)
+
     #
     # Tests that adding Constraint.Skip increments
     # the internal counter but does not create an object
@@ -921,6 +943,7 @@ class Test2DArrayCon(unittest.TestCase):
         model.c = Constraint(rule=f)
 
         self.assertEqual(len(model.c),1)
+
 
 class MiscConTests(unittest.TestCase):
 
