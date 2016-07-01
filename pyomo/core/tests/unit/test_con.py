@@ -692,7 +692,7 @@ class TestConList(unittest.TestCase):
         model.A = Set(initialize=[1,2,3,4])
         return model
 
-    def test_add(self):
+    def test_add1(self):
         model = ConcreteModel()
         model.x = Var()
         model.c = Constraint()
@@ -711,6 +711,28 @@ class TestConList(unittest.TestCase):
         model.c.add(model.x >= 3)
         self.assertTrue(1 in model.c)
         self.assertTrue(3 in model.c)
+        self.assertTrue("a" in model.c)
+        self.assertEqual(len(model.c), 3)
+
+    def test_add2(self):
+        model = ConcreteModel()
+        model.x = Var()
+        model.c = Constraint(base=0)
+
+        model.c.add(model.x >= 1)
+        self.assertTrue(0 in model.c)
+        self.assertTrue(1 not in model.c)
+        self.assertEqual(len(model.c), 1)
+
+        model.c.add("a", model.x >= 2)
+        self.assertTrue(0 in model.c)
+        self.assertTrue(1 not in model.c)
+        self.assertTrue("a" in model.c)
+        self.assertEqual(len(model.c), 2)
+
+        model.c.add(model.x >= 3)
+        self.assertTrue(0 in model.c)
+        self.assertTrue(2 in model.c)
         self.assertTrue("a" in model.c)
         self.assertEqual(len(model.c), 3)
 

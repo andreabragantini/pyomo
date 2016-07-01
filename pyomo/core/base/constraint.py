@@ -1108,7 +1108,7 @@ class ConstraintList(IndexedConstraint):
     def __init__(self, **kwargs):
         """Constructor"""
         args = (Set(),)
-        self._nconstraints = 0
+        self._nconstraints = kwargs.pop('base',1)-1
         if 'expr' in kwargs:
             raise ValueError(
                 "ConstraintList does not accept the 'expr' keyword")
