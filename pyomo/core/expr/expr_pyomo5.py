@@ -62,6 +62,7 @@ __all__ = (
 'SimpleExpressionVisitor',
 'ExpressionValueVisitor',
 'ExpressionReplacementVisitor',
+'SimpleExpressionReplacementVisitor',
 'LinearDecompositionError',
 '_SumExpression',               # This should not be referenced, except perhaps while testing code
 '_MutableViewSumExpression',    # This should not be referenced, except perhaps while testing code
@@ -669,6 +670,7 @@ class ExpressionReplacementVisitor(object):
                     _stack.append( (_obj, _argList, _idx, _len, _result) )
                     _obj                    = _sub
                     #_argList                = self.children(_sub)
+                    print('***', _sub)
                     _argList                = _sub._args_
                     _idx                    = 0
                     _len                    = _sub.nargs()
@@ -694,6 +696,41 @@ class ExpressionReplacementVisitor(object):
             else:
                 return self.finalize(ans)
 
+
+class SimpleExpressionReplacementVisitor(ExpressionReplacementVisitor):
+    """
+    Base class for an expression walker that builds a new expression tree while
+    allowing replacement of any node in the tree. To use, create a derived class
+    with your implementation of "replace_node(node)". This method should return
+    None if you don't want to replace anything (keep this node in the new tree),
+    or return a new node if you do want to replace it.
+    """
+    def __init__(self, substitution_map, skip_expressions=None):
+        super(SimpleExpressionReplacementVisitor, self).__init__()
+
+    def replace_node(self, node):
+        """ Implement this method to return the replacement for "node". Return None to
+        continue traversing the tree without replacement."""
+        raise NotImplementedError("replace_node not implemented in the SimpleExpressionReplacementVisitor."
+                                  " This method should be implemented in the derived class.")
+
+    def visiting_potential_leaf(self, node):
+        # call the virtual method replace_node to see if this node should be replaced
+        new_node = self.replace_node(node)
+
+        if new_node is not None:
+            # replace this node and stop traversing the tree
+            return True, new_node
+
+        if type(node) in native_numeric_types or \
+            not node.is_expression_type():  # or type(node) is IndexTemplate:
+            # this is a leaf, and the derived class has NOT asked for replacement
+            # stop traversing the tree and return the current node.
+            # ToDo: Is there a more general check for "is leaf"?
+            return True, node
+
+        # no replacement requested, continue traversing the tree
+        return False, None
 
 
 #-------------------------------------------------------
