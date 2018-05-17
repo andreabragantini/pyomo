@@ -106,6 +106,11 @@ from pyomo.core.expr.expr_common import \
      _imul, _idiv, _ipow, _lt, _le,
      _eq)
 from pyomo.core.expr import expr_common as common
+try:
+    from sys import getrefcount
+    _getrefcount_available = True
+except ImportError:
+    _getrefcount_available = False
 
 
 if _using_chained_inequality:               #pragma: no cover
@@ -2225,11 +2230,14 @@ class SumExpression(SumExpressionBase):
     """
     __slots__ = ('_nargs','_shared_args')
     PRECEDENCE = 6
+    _REFERENCE_COUNT = None
 
     def __init__(self, args):
         self._args_ = args
         self._shared_args = False
         self._nargs = len(self._args_)
+        if _getrefcount_available:
+            SumExpression._REFERENCE_COUNT = getrefcount(self)
 
     def add(self, new_arg):
         if new_arg.__class__ in native_numeric_types and new_arg == 0:
@@ -2327,6 +2335,8 @@ class _MutableSumExpression(SumExpression):
             self._args_.append(new_arg)
         self._nargs = len(self._args_)
         return self
+
+add_mutable = _MutableSumExpression.add
 
 
 class GetItemExpression(ExpressionBase):
@@ -2997,11 +3007,25 @@ def _generate_sum_expression(etype, _self, _other):
         #
         # x + y
         #
-        if (_self.__class__ is SumExpression and not _self._shared_args) or \
-           _self.__class__ is _MutableSumExpression:
+        if _self.__class__ is SumExpression and not _self._shared_args:
+            if _getrefcount_available:
+                #print(SumExpression._REFERENCE_COUNT)
+                _count = getrefcount(_self)
+                if _count == SumExpression._REFERENCE_COUNT:
+                    #print("HERE - x")
+                    return add_mutable(_self, _other)
             return _self.add(_other)
-        elif (_other.__class__ is SumExpression and not _other._shared_args) or \
-            _other.__class__ is _MutableSumExpression:
+        elif _other.__class__ is SumExpression and not _other._shared_args:
+            if _getrefcount_available:
+                #print(SumExpression._REFERENCE_COUNT)
+                _count = getrefcount(_other)
+                if _count == SumExpression._REFERENCE_COUNT:
+                    #print("HERE - x")
+                    return add_mutable(_other, _self)
+            return _other.add(_self)
+        elif _self.__class__ is _MutableSumExpression:
+            return _self.add(_other)
+        elif _other.__class__ is _MutableSumExpression:
             return _other.add(_self)
         elif _other.__class__ in native_numeric_types:
             if _self.__class__ in native_numeric_types:
@@ -3015,15 +3039,11 @@ def _generate_sum_expression(etype, _self, _other):
             if _self == 0:
                 return _other
             if _other.is_potentially_variable():
-                #return _LinearSumExpression((_self, _other))
                 return SumExpression([_self, _other])
             return NPV_SumExpression((_self, _other))
         elif _other.is_potentially_variable():
-            #return _LinearSumExpression((_self, _other))
             return SumExpression([_self, _other])
         elif _self.is_potentially_variable():
-            #return _LinearSumExpression((_other, _self))
-            #return SumExpression([_other, _self])
             return SumExpression([_self, _other])
         else:
             return NPV_SumExpression((_self, _other))
@@ -3032,8 +3052,15 @@ def _generate_sum_expression(etype, _self, _other):
         #
         # x - y
         #
-        if (_self.__class__ is SumExpression and not _self._shared_args) or \
-           _self.__class__ is _MutableSumExpression:
+        if _self.__class__ is SumExpression and not _self._shared_args:
+            if _getrefcount_available:
+                #print(SumExpression._REFERENCE_COUNT)
+                _count = getrefcount(_self)
+                if _count == SumExpression._REFERENCE_COUNT:
+                    #print("HERE - x")
+                    return add_mutable(_self, -_other)
+            return _self.add(-_other)
+        elif _self.__class__ is _MutableSumExpression:
             return _self.add(-_other)
         elif _other.__class__ in native_numeric_types:
             if _self.__class__ in native_numeric_types:

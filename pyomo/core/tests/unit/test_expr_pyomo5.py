@@ -5458,7 +5458,8 @@ class TestNonlinearExpression(unittest.TestCase):
             e_ = 2 + m.v[0]
             self.assertIs(e_.__class__, EXPR.SumExpression)
             e += e_
-            self.assertIs(e.__class__, EXPR._MutableSumExpression)
+            self.assertIs(e.__class__, EXPR._SumExpression)
+            #self.assertIs(e.__class__, EXPR._MutableSumExpression)
             self.assertEqual(e.nargs(), 2)
 
 
