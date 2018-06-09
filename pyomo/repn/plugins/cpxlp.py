@@ -56,11 +56,10 @@ class ProblemWriter_cpxlp(AbstractProblemWriter):
 
         AbstractProblemWriter.__init__(self, ProblemFormat.cpxlp)
 
-        # the LP writer is responsible for tracking which variables are
-        # referenced in constraints, so that one doesn't end up with a
-        # zillion "unreferenced variables" warning messages. stored at
-        # the object level to avoid additional method arguments.
-        # dictionary of id(_VarData)->_VarData.
+        # The LP writer tracks which variables are
+        # referenced in constraints, so that a user does not end up with a
+        # zillion "unreferenced variables" warning messages.
+        # This dictionary maps id(_VarData) -> _VarData.
         self._referenced_variable_ids = {}
 
         # Keven Hunter made a nice point about using %.16g in his attachment
@@ -81,68 +80,86 @@ class ProblemWriter_cpxlp(AbstractProblemWriter):
                  output_filename,
                  solver_capability,
                  io_options):
-
+        #
         # Make sure not to modify the user's dictionary,
         # they may be reusing it outside of this call
+        #
         io_options = dict(io_options)
-
-        # Skip writing constraints whose body section is
+        #
+        # If True, then skip writing constraints whose body section is
         # fixed (i.e., no variables)
+        #
         skip_trivial_constraints = \
             io_options.pop("skip_trivial_constraints", False)
-
-        # Use full Pyomo component names in the LP file rather
+        #
+        # If True, then use full Pyomo component names in the LP file rather
         # than shortened symbols (slower, but useful for debugging).
+        #
         symbolic_solver_labels = \
             io_options.pop("symbolic_solver_labels", False)
-
+        #
+        # If True, then output fixed variable bounds.  (TODO)
+        #
         output_fixed_variable_bounds = \
             io_options.pop("output_fixed_variable_bounds", False)
-
+        #
         # If False, unused variables will not be included in
         # the LP file. Otherwise, include all variables in
         # the bounds sections.
+        #
         include_all_variable_bounds = \
             io_options.pop("include_all_variable_bounds", False)
-
+        #
+        # Specify the type of labeler used for variables
+        #
         labeler = io_options.pop("labeler", None)
-
-        # How much effort do we want to put into ensuring the
+        #
+        # Specify how much effort do we want to put into ensuring the
         # LP file is written deterministically for a Pyomo model:
         #    0 : None
         #    1 : sort keys of indexed components (default)
         #    2 : sort keys AND sort names (over declaration order)
+        #
         file_determinism = io_options.pop("file_determinism", 1)
-
-        # user defined orderings for variable and constraint
-        # output
+        #
+        # Specify orderings for variable and constraint output
+        #
         row_order = io_options.pop("row_order", None)
         column_order = io_options.pop("column_order", None)
-
-        # make sure the ONE_VAR_CONSTANT variable appears in
+        #
+        # Make sure the ONE_VAR_CONSTANT variable appears in
         # the objective even if the constant part of the
         # objective is zero
+        #
         force_objective_constant = \
             io_options.pop("force_objective_constant", False)
 
+        #
+        # Check for Errors
+        #
         if len(io_options):
             raise ValueError(
                 "ProblemWriter_cpxlp passed unrecognized io_options:\n\t" +
                 "\n\t".join("%s = %s" % (k,v) for k,v in iteritems(io_options)))
-
         if symbolic_solver_labels and (labeler is not None):
             raise ValueError("ProblemWriter_cpxlp: Using both the "
                              "'symbolic_solver_labels' and 'labeler' "
                              "I/O options is forbidden")
 
+        #
+        # Create a labeler
+        #
         if symbolic_solver_labels:
             labeler = TextLabeler()
         elif labeler is None:
             labeler = NumericLabeler('x')
-
-        # clear the collection of referenced variables.
+        #
+        # Clear the collection of referenced variables.
+        #
         self._referenced_variable_ids.clear()
-
+        #
+        # Create the output filename
+        #
         if output_filename is None:
             output_filename = model.name + ".lp"
 
@@ -173,7 +190,7 @@ class ProblemWriter_cpxlp(AbstractProblemWriter):
 
     def _print_expr_canonical(self,
                               x,
-                              output_file,
+                              output,
                               object_symbol_dictionary,
                               variable_symbol_dictionary,
                               is_objective,
@@ -209,14 +226,14 @@ class ProblemWriter_cpxlp(AbstractProblemWriter):
                 #
                 names = [variable_symbol_dictionary[id(var)] for var in x.linear_vars]
                 for i, name in sorted(enumerate(names), key=lambda x: x[1]):
-                    output_file.write(linear_coef_string_template % (x.linear_coefs[i], name))
+                    output.append(linear_coef_string_template % (x.linear_coefs[i], name))
             else:
                 #
                 # Order columns by the value of column_order[]
                 #
                 for i, var in sorted(enumerate(x.linear_vars), key=lambda x: column_order[x[1]]):
                     name = variable_symbol_dictionary[id(var)]
-                    output_file.write(linear_coef_string_template % (x.linear_coefs[i], name))
+                    output.append(linear_coef_string_template % (x.linear_coefs[i], name))
         #
         # Quadratic
         #
@@ -226,7 +243,7 @@ class ProblemWriter_cpxlp(AbstractProblemWriter):
                 self._referenced_variable_ids[id(var1)] = var1
                 self._referenced_variable_ids[id(var2)] = var2
 
-            output_file.write("+ [\n")
+            output.append("+ [\n")
 
             if column_order is None:
                 #
@@ -255,13 +272,13 @@ class ProblemWriter_cpxlp(AbstractProblemWriter):
                     #
                     if is_objective:
                         tmp = 2*x.quadratic_coefs[i]
-                        output_file.write(quad_coef_string_template % tmp)
+                        output.append(quad_coef_string_template % tmp)
                     else:
-                        output_file.write(quad_coef_string_template % x.quadratic_coefs[i])
+                        output.append(quad_coef_string_template % x.quadratic_coefs[i])
                     if i in quad:
-                        output_file.write("%s ^ 2\n" % (names_[0]))
+                        output.append("%s ^ 2\n" % (names_[0]))
                     else:
-                        output_file.write("%s * %s\n" % (names_[0], names_[1]))
+                        output.append("%s * %s\n" % (names_[0], names_[1]))
             else:
                 #
                 # Order columns by the value of column_order[]
@@ -288,22 +305,22 @@ class ProblemWriter_cpxlp(AbstractProblemWriter):
                     # Ref: ILog CPlex 8.0 User's Manual, p197.
                     #
                     if is_objective:
-                        output_file.write(quad_coef_string_template % 2*x.quadratic_coefs[i])
+                        output.append(quad_coef_string_template % 2*x.quadratic_coefs[i])
                     else:
-                        output_file.write(quad_coef_string_template % x.quadratic_coefs[i])
+                        output.append(quad_coef_string_template % x.quadratic_coefs[i])
                     if i in quad:
-                        output_file.write("%s ^ 2\n" % cols_[1])
+                        output.append("%s ^ 2\n" % cols_[1])
                     else:
-                        output_file.write("%s * %s\n" % (cols_[1], cols_[2]))
+                        output.append("%s * %s\n" % (cols_[1], cols_[2]))
 
-            output_file.write("]")
+            output.append("]")
 
             if is_objective:
-                output_file.write(' / 2\n')
+                output.append(' / 2\n')
                 # divide by 2 because LP format requires /2 for all the quadratic
                 # terms.  Weird.  Ref: ILog CPlex 8.0 User's Manual, p197
             else:
-                output_file.write("\n")
+                output.append("\n")
 
         if constant and not is_objective:
             # If we made it to here we are outputing
@@ -312,7 +329,7 @@ class ProblemWriter_cpxlp(AbstractProblemWriter):
             # constraint for the benefit of solvers like
             # Glpk that cannot parse an LP file without
             # a variable on the left hand side.
-            output_file.write(linear_coef_string_template % (0, 'ONE_VAR_CONSTANT'))
+            output.append(linear_coef_string_template % (0, 'ONE_VAR_CONSTANT'))
 
         #
         # Constant offset
@@ -322,7 +339,7 @@ class ProblemWriter_cpxlp(AbstractProblemWriter):
         #
         obj_string_template = '%+'+self._precision_string+' %s\n'
         if is_objective and (force_objective_constant or (x.constant != 0.0)):
-            output_file.write(obj_string_template
+            output.append(obj_string_template
                               % (x.constant, 'ONE_VAR_CONSTANT'))
 
         #
@@ -335,7 +352,7 @@ class ProblemWriter_cpxlp(AbstractProblemWriter):
                  labeler,
                  variable_symbol_map,
                  soscondata,
-                 output_file):
+                 output):
         """
         Prints the SOS constraint associated with the _SOSConstraintData object
         """
@@ -350,7 +367,7 @@ class ProblemWriter_cpxlp(AbstractProblemWriter):
 
         level = soscondata.level
 
-        output_file.write('%s: S%s::\n'
+        output.append('%s: S%s::\n'
                           % (symbol_map.getSymbol(soscondata,labeler), level))
 
         sos_template_string = "%s:%"+self._precision_string+"\n"
@@ -367,7 +384,7 @@ class ProblemWriter_cpxlp(AbstractProblemWriter):
                     "currently not supported. Deactive this constraint in order to "
                     "proceed." % (soscondata.name, vardata.name))
             self._referenced_variable_ids[id(vardata)] = vardata
-            output_file.write(sos_template_string
+            output.append(sos_template_string
                               % (variable_symbol_map.getSymbol(vardata),
                                  weight))
 
@@ -384,37 +401,32 @@ class ProblemWriter_cpxlp(AbstractProblemWriter):
                         force_objective_constant=False,
                         include_all_variable_bounds=False):
 
-        symbol_map = SymbolMap()
-        variable_symbol_map = SymbolMap()
+        #
+        # Cache frequently called functions
         # NOTE: we use createSymbol instead of getSymbol because we
         #       know whether or not the symbol exists, and don't want
         #       to the overhead of error/duplicate checking.
-        # cache frequently called functions
+        #
+        print_expr_canonical = self._print_expr_canonical
         create_symbol_func = SymbolMap.createSymbol
         create_symbols_func = SymbolMap.createSymbols
         alias_symbol_func = SymbolMap.alias
-        variable_label_pairs = []
-
-        # populate the symbol map in a single pass.
-        #objective_list, constraint_list, sosconstraint_list, variable_list \
-        #    = self._populate_symbol_map(model,
-        #                                symbol_map,
-        #                                labeler,
-        #                                variable_symbol_map,
-        #                                file_determinism=file_determinism)
+        #
+        # Define the sort order
+        #
         sortOrder = SortComponents.unsorted
         if file_determinism >= 1:
             sortOrder = sortOrder | SortComponents.indices
             if file_determinism >= 2:
                 sortOrder = sortOrder | SortComponents.alphabetical
-
         #
         # Create variable symbols (and cache the block list)
         #
+        symbol_map = SymbolMap()
+        variable_symbol_map = SymbolMap()
         all_blocks = []
         variable_list = []
-        for block in model.block_data_objects(active=True,
-                                              sort=sortOrder):
+        for block in model.block_data_objects(active=True, sort=sortOrder):
 
             all_blocks.append(block)
 
@@ -425,10 +437,6 @@ class ProblemWriter_cpxlp(AbstractProblemWriter):
                     descend_into=False):
 
                 variable_list.append(vardata)
-                variable_label_pairs.append(
-                    (vardata,create_symbol_func(symbol_map,
-                                                vardata,
-                                                labeler)))
         #
         # WEH - TODO:  See if this is faster
         #
@@ -436,25 +444,25 @@ class ProblemWriter_cpxlp(AbstractProblemWriter):
         #        active=True, sort=sortOrder) )
         #variable_list = list( model.component_data_objects(
         #        Var, sort=sortOrder) )
-        #variable_label_pairs = list(
-        #    (vardata, create_symbol_func(symbol_map, vardata, labeler))
-        #    for vardata in variable_list )
 
-        variable_symbol_map.addSymbols(variable_label_pairs)
-
-        # and extract the information we'll need for rapid labeling.
+        #
+        # Update symbol map and extract the information 
+        # we'll need for rapid labeling.
+        #
+        variable_symbol_map.addSymbols(
+                (vardata, create_symbol_func(symbol_map, vardata, labeler))
+                for vardata in variable_list )
         object_symbol_dictionary = symbol_map.byObject
         variable_symbol_dictionary = variable_symbol_map.byObject
 
-        # cache - these are called all the time.
-        print_expr_canonical = self._print_expr_canonical
+        output = []
 
         # print the model name and the source, so we know roughly where
         # it came from.
         #
         # NOTE: this *must* use the "\* ... *\" comment format: the GLPK
         # LP parser does not correctly handle other formats (notably, "%").
-        output_file.write(
+        output.append(
             "\\* Source Pyomo model name=%s *\\\n\n" % (model.name,) )
 
         #
@@ -466,8 +474,6 @@ class ProblemWriter_cpxlp(AbstractProblemWriter):
         numObj = 0
         onames = []
         for block in all_blocks:
-
-            gen_obj_repn = getattr(block, "_gen_obj_repn", True)
 
             # Get/Create the ComponentMap for the repn
             if not hasattr(block,'_repn'):
@@ -494,11 +500,11 @@ class ProblemWriter_cpxlp(AbstractProblemWriter):
 
                 symbol_map.alias(objective_data, '__default_objective__')
                 if objective_data.is_minimizing():
-                    output_file.write("min \n")
+                    output.append("min \n")
                 else:
-                    output_file.write("max \n")
+                    output.append("max \n")
 
-                if gen_obj_repn:
+                if getattr(block, "_gen_obj_repn", True):
                     repn = generate_standard_repn(objective_data.expr)
                     block_repn[objective_data] = repn
                 else:
@@ -523,12 +529,13 @@ class ProblemWriter_cpxlp(AbstractProblemWriter):
                         "has nonlinear terms that are not quadratic."
                         % objective_data.name)
 
-                output_file.write(
-                    object_symbol_dictionary[id(objective_data)]+':\n')
+                output.append(
+                    object_symbol_dictionary[id(objective_data)])
+                output.append(':\n')
 
                 offset = print_expr_canonical(
                     repn,
-                    output_file,
+                    output,
                     object_symbol_dictionary,
                     variable_symbol_dictionary,
                     True,
@@ -548,9 +555,9 @@ class ProblemWriter_cpxlp(AbstractProblemWriter):
         # to whine elsewhere. Output a warning if the constraint block is empty,
         # so users can quickly determine the cause of the solve failure.
 
-        output_file.write("\n")
-        output_file.write("s.t.\n")
-        output_file.write("\n")
+        output.append("\n")
+        output.append("s.t.\n")
+        output.append("\n")
 
         have_nontrivial = False
 
@@ -636,18 +643,19 @@ class ProblemWriter_cpxlp(AbstractProblemWriter):
                     value(constraint_data.upper)
                 label = 'c_e_' + con_symbol + '_'
                 alias_symbol_func(symbol_map, constraint_data, label)
-                output_file.write(label+':\n')
+                output.append(label)
+                output.append(':\n')
                 offset = print_expr_canonical(repn,
-                                              output_file,
+                                              output,
                                               object_symbol_dictionary,
                                               variable_symbol_dictionary,
                                               False,
                                               column_order)
                 bound = constraint_data.lower
                 bound = _get_bound(bound) - offset
-                output_file.write(eq_string_template
+                output.append(eq_string_template
                                   % (_no_negative_zero(bound)))
-                output_file.write("\n")
+                output.append("\n")
             else:
                 if constraint_data.has_lb():
                     if constraint_data.has_ub():
@@ -655,16 +663,17 @@ class ProblemWriter_cpxlp(AbstractProblemWriter):
                     else:
                         label = 'c_l_' + con_symbol + '_'
                     alias_symbol_func(symbol_map, constraint_data, label)
-                    output_file.write(label+':\n')
+                    output.append(label)
+                    output.append(':\n')
                     offset = print_expr_canonical(repn,
-                                                  output_file,
+                                                  output,
                                                   object_symbol_dictionary,
                                                   variable_symbol_dictionary,
                                                   False,
                                                   column_order)
                     bound = constraint_data.lower
                     bound = _get_bound(bound) - offset
-                    output_file.write(geq_string_template
+                    output.append(geq_string_template
                                       % (_no_negative_zero(bound)))
                 else:
                     assert constraint_data.has_ub()
@@ -675,16 +684,17 @@ class ProblemWriter_cpxlp(AbstractProblemWriter):
                     else:
                         label = 'c_u_' + con_symbol + '_'
                     alias_symbol_func(symbol_map, constraint_data, label)
-                    output_file.write(label+':\n')
+                    output.append(label)
+                    output.append(':\n')
                     offset = print_expr_canonical(repn,
-                                                  output_file,
+                                                  output,
                                                   object_symbol_dictionary,
                                                   variable_symbol_dictionary,
                                                   False,
                                                   column_order)
                     bound = constraint_data.upper
                     bound = _get_bound(bound) - offset
-                    output_file.write(leq_string_template
+                    output.append(leq_string_template
                                       % (_no_negative_zero(bound)))
                 else:
                     assert constraint_data.has_lb()
@@ -699,9 +709,9 @@ class ProblemWriter_cpxlp(AbstractProblemWriter):
         # to the value 1.  This is used when quadratic terms are present.
         # worst-case, if not used, is that CPLEX easily pre-processes it out.
         prefix = ""
-        output_file.write('%sc_e_ONE_VAR_CONSTANT: \n' % prefix)
-        output_file.write('%sONE_VAR_CONSTANT = 1.0\n' % prefix)
-        output_file.write("\n")
+        output.append('%sc_e_ONE_VAR_CONSTANT: \n' % prefix)
+        output.append('%sONE_VAR_CONSTANT = 1.0\n' % prefix)
+        output.append("\n")
 
         # SOS constraints
         #
@@ -755,7 +765,7 @@ class ProblemWriter_cpxlp(AbstractProblemWriter):
         # Bounds
         #
 
-        output_file.write("bounds\n")
+        output.append("bounds\n")
 
         # Scan all variables even if we're only writing a subset of them.
         # required because we don't store maps by variable type currently.
@@ -811,47 +821,47 @@ class ProblemWriter_cpxlp(AbstractProblemWriter):
             # in the CPLEX LP file format, the default variable
             # bounds are 0 and +inf.  These bounds are in
             # conflict with Pyomo, which assumes -inf and +inf
-            # (which we would argue is more rational).
-            output_file.write("   ")
+            output.append("   ")
             if vardata.has_lb():
-                output_file.write(lb_string_template
+                output.append(lb_string_template
                                   % (_no_negative_zero(vardata_lb)))
             else:
-                output_file.write(" -inf <= ")
+                output.append(" -inf <= ")
             if name_to_output == "e":
                 raise ValueError(
                     "Attempting to write variable with name 'e' in a CPLEX LP "
                     "formatted file will cause a parse failure due to confusion with "
                     "numeric values expressed in scientific notation")
 
-            output_file.write(name_to_output)
+            output.append(name_to_output)
             if vardata.has_ub():
-                output_file.write(ub_string_template
+                output.append(ub_string_template
                                   % (_no_negative_zero(vardata_ub)))
             else:
-                output_file.write(" <= +inf\n")
+                output.append(" <= +inf\n")
 
         if len(integer_vars) > 0:
 
-            output_file.write("general\n")
+            output.append("general\n")
             for var_name in integer_vars:
-                output_file.write('  %s\n' % var_name)
+                output.append('  %s\n' % var_name)
 
         if len(binary_vars) > 0:
 
-            output_file.write("binary\n")
+            output.append("binary\n")
             for var_name in binary_vars:
-                output_file.write('  %s\n' % var_name)
+                output.append('  %s\n' % var_name)
 
 
         # Write the SOS section
-        output_file.write(SOSlines.getvalue())
+        output.append(SOSlines.getvalue())
 
         #
         # wrap-up
         #
-        output_file.write("end\n")
+        output.append("end\n")
 
+        output_file.write( "".join(output) )
         # Clean up the symbol map to only contain variables referenced
         # in the active constraints **Note**: warm start method may
         # rely on this for choosing the set of potential warm start
