@@ -435,10 +435,10 @@ class ProblemWriter_cpxlp(AbstractProblemWriter):
             # Iterate through objectives
             #
             for objective_data in block.component_data_objects(
-                    Objective,
-                    active=True,
-                    sort=sortOrder,
-                    descend_into=False):
+                        Objective,
+                        active=True,
+                        sort=sortOrder,
+                        descend_into=False):
 
                 if getattr(block, "_gen_obj_repn", True):
                     repn = generate_standard_repn(objective_data.expr)
@@ -458,10 +458,10 @@ class ProblemWriter_cpxlp(AbstractProblemWriter):
             # Iterate through constraints
             #
             for constraint_data in block.component_data_objects(
-                    Constraint,
-                    active=True,
-                    sort=sortOrder,
-                    descend_into=False):
+                        Constraint,
+                        active=True,
+                        sort=sortOrder,
+                        descend_into=False):
 
                 if (not constraint_data.has_lb()) and \
                    (not constraint_data.has_ub()):
@@ -485,10 +485,10 @@ class ProblemWriter_cpxlp(AbstractProblemWriter):
                 all_constraints.append( (constraint_data, repn) )
 
             for soscondata in block.component_data_objects(
-                    SOSConstraint,
-                    active=True,
-                    sort=sortOrder,
-                    descend_into=False):
+                        SOSConstraint,
+                        active=True,
+                        sort=sortOrder,
+                        descend_into=False):
 
                 if hasattr(soscondata, 'get_items'):
                     sos_items = list(soscondata.get_items())
@@ -516,6 +516,7 @@ class ProblemWriter_cpxlp(AbstractProblemWriter):
         # TODO: Avoid this re-walk of the entire tree to find all variables
         #
         all_variables = list( v for v in model.component_data_objects(Var, sort=sortOrder) if id(v) in variable_ids )
+        #all_variables = list( variable_ids.values() )
 
         #
         # Update symbol map and extract the information 
