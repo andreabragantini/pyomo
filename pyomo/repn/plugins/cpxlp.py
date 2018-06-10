@@ -15,6 +15,7 @@
 import logging
 import math
 import operator
+import itertools
 
 from six import iterkeys, iteritems, StringIO
 from six.moves import xrange
@@ -217,9 +218,6 @@ class ProblemWriter_cpxlp(AbstractProblemWriter):
         #
         if len(x.linear_vars) > 0:
             constant=False
-            for vardata in x.linear_vars:
-                self._referenced_variable_ids[id(vardata)] = vardata
-
             if column_order is None:
                 #
                 # Order columns by dictionary names
@@ -239,10 +237,6 @@ class ProblemWriter_cpxlp(AbstractProblemWriter):
         #
         if len(x.quadratic_vars) > 0:
             constant=False
-            for var1, var2 in x.quadratic_vars:
-                self._referenced_variable_ids[id(var1)] = var1
-                self._referenced_variable_ids[id(var2)] = var2
-
             output.append("+ [\n")
 
             if column_order is None:
@@ -383,7 +377,6 @@ class ProblemWriter_cpxlp(AbstractProblemWriter):
                     "SOSConstraint '%s' includes a fixed variable '%s'. This is "
                     "currently not supported. Deactive this constraint in order to "
                     "proceed." % (soscondata.name, vardata.name))
-            self._referenced_variable_ids[id(vardata)] = vardata
             output.append(sos_template_string
                               % (variable_symbol_map.getSymbol(vardata),
                                  weight))
@@ -424,26 +417,105 @@ class ProblemWriter_cpxlp(AbstractProblemWriter):
         #
         symbol_map = SymbolMap()
         variable_symbol_map = SymbolMap()
-        all_blocks = []
-        variable_list = []
+        all_objectives = []
+        all_constraints = []
+        all_sos = []
+        variable_ids = self._referenced_variable_ids
+        #
+        # Iterate through blocks
+        #
         for block in model.block_data_objects(active=True, sort=sortOrder):
 
-            all_blocks.append(block)
+            # Get/Create the ComponentMap for the repn
+            if not hasattr(block,'_repn'):
+                block._repn = ComponentMap()
+            block_repn = block._repn
 
-            for vardata in block.component_data_objects(
-                    Var,
+            #
+            # Iterate through objectives
+            #
+            for objective_data in block.component_data_objects(
+                    Objective,
                     active=True,
                     sort=sortOrder,
                     descend_into=False):
 
-                variable_list.append(vardata)
+                if getattr(block, "_gen_obj_repn", True):
+                    repn = generate_standard_repn(objective_data.expr)
+                    block_repn[objective_data] = repn
+                else:
+                    repn = block_repn[objective_data]
+
+                for v in itertools.chain(repn.linear_vars, repn.nonlinear_vars):
+                    variable_ids[id(v)] = v
+                for v1, v2 in repn.quadratic_vars:
+                    variable_ids[id(v1)] = v1
+                    variable_ids[id(v2)] = v2
+
+                all_objectives.append( (objective_data, repn) )
+
+            #
+            # Iterate through constraints
+            #
+            for constraint_data in block.component_data_objects(
+                    Constraint,
+                    active=True,
+                    sort=sortOrder,
+                    descend_into=False):
+
+                if (not constraint_data.has_lb()) and \
+                   (not constraint_data.has_ub()):
+                    assert not constraint_data.equality
+                    continue # non-binding, so skip
+
+                if constraint_data._linear_canonical_form:
+                    repn = constraint_data.canonical_form()
+                elif getattr(block, "_gen_con_repn", True):
+                    repn = generate_standard_repn(constraint_data.body)
+                    block_repn[constraint_data] = repn
+                else:
+                    repn = block_repn[constraint_data]
+
+                for v in itertools.chain(repn.linear_vars, repn.nonlinear_vars):
+                    variable_ids[id(v)] = v
+                for v1, v2 in repn.quadratic_vars:
+                    variable_ids[id(v1)] = v1
+                    variable_ids[id(v2)] = v2
+
+                all_constraints.append( (constraint_data, repn) )
+
+            for soscondata in block.component_data_objects(
+                    SOSConstraint,
+                    active=True,
+                    sort=sortOrder,
+                    descend_into=False):
+
+                if hasattr(soscondata, 'get_items'):
+                    sos_items = list(soscondata.get_items())
+                else:
+                    sos_items = list(soscondata.items())
+                for v, w in soscondata:
+                    variable_ids[id(v)] = v
+
+                all_sos.append( soscondata )
+
+        #    for vardata in block.component_data_objects(
+        #            Var,
+        #            active=True,
+        #            sort=sortOrder,
+        #            descend_into=False):
+        #
+        #        variable_list.append(vardata)
         #
         # WEH - TODO:  See if this is faster
         #
         #all_blocks = list( model.block_data_objects(
         #        active=True, sort=sortOrder) )
-        #variable_list = list( model.component_data_objects(
-        #        Var, sort=sortOrder) )
+
+        #
+        # TODO: Avoid this re-walk of the entire tree to find all variables
+        #
+        all_variables = list( v for v in model.component_data_objects(Var, sort=sortOrder) if id(v) in variable_ids )
 
         #
         # Update symbol map and extract the information 
@@ -451,7 +523,7 @@ class ProblemWriter_cpxlp(AbstractProblemWriter):
         #
         variable_symbol_map.addSymbols(
                 (vardata, create_symbol_func(symbol_map, vardata, labeler))
-                for vardata in variable_list )
+                for vardata in all_variables )
         object_symbol_dictionary = symbol_map.byObject
         variable_symbol_dictionary = variable_symbol_map.byObject
 
@@ -473,18 +545,7 @@ class ProblemWriter_cpxlp(AbstractProblemWriter):
 
         numObj = 0
         onames = []
-        for block in all_blocks:
-
-            # Get/Create the ComponentMap for the repn
-            if not hasattr(block,'_repn'):
-                block._repn = ComponentMap()
-            block_repn = block._repn
-
-            for objective_data in block.component_data_objects(
-                    Objective,
-                    active=True,
-                    sort=sortOrder,
-                    descend_into=False):
+        for objective_data, repn in all_objectives:
 
                 numObj += 1
                 onames.append(objective_data.name)
@@ -503,12 +564,6 @@ class ProblemWriter_cpxlp(AbstractProblemWriter):
                     output.append("min \n")
                 else:
                     output.append("max \n")
-
-                if getattr(block, "_gen_obj_repn", True):
-                    repn = generate_standard_repn(objective_data.expr)
-                    block_repn[objective_data] = repn
-                else:
-                    repn = block_repn[objective_data]
 
                 degree = repn.polynomial_degree()
 
@@ -563,45 +618,17 @@ class ProblemWriter_cpxlp(AbstractProblemWriter):
 
         supports_quadratic_constraint = solver_capability('quadratic_constraint')
 
-        def constraint_generator():
-            for block in all_blocks:
-
-                gen_con_repn = getattr(block, "_gen_con_repn", True)
-
-                # Get/Create the ComponentMap for the repn
-                if not hasattr(block,'_repn'):
-                    block._repn = ComponentMap()
-                block_repn = block._repn
-
-                for constraint_data in block.component_data_objects(
-                        Constraint,
-                        active=True,
-                        sort=sortOrder,
-                        descend_into=False):
-
-                    if (not constraint_data.has_lb()) and \
-                       (not constraint_data.has_ub()):
-                        assert not constraint_data.equality
-                        continue # non-binding, so skip
-
-                    if constraint_data._linear_canonical_form:
-                        repn = constraint_data.canonical_form()
-                    elif gen_con_repn:
-                        repn = generate_standard_repn(constraint_data.body)
-                        block_repn[constraint_data] = repn
-                    else:
-                        repn = block_repn[constraint_data]
-
-                    yield constraint_data, repn
-
         if row_order is not None:
-            sorted_constraint_list = list(constraint_generator())
-            sorted_constraint_list.sort(key=lambda x: row_order[x[0]])
             def yield_all_constraints():
-                for data, repn in sorted_constraint_list:
-                    yield data, repn
+                sorted_constraint_list = copy.copy(all_constraints)
+                sorted_constraint_list.sort(key=lambda x: row_order[x[0]])
+                for constraint_data, repn in sorted_constraint_list:
+                    yield constraint_data, repn
         else:
-            yield_all_constraints = constraint_generator
+            def yield_all_constraints():
+                for constraint_data, repn in all_constraints:
+                        yield constraint_data, repn
+
 
         # FIXME: This is a hack to get nested blocks working...
         eq_string_template = "= %"+self._precision_string+'\n'
@@ -731,35 +758,29 @@ class ProblemWriter_cpxlp(AbstractProblemWriter):
         sos1 = solver_capability("sos1")
         sos2 = solver_capability("sos2")
         writtenSOS = False
-        for block in all_blocks:
+        for soscondata in all_sos:
 
-            for soscondata in block.component_data_objects(
-                    SOSConstraint,
-                    active=True,
-                    sort=sortOrder,
-                    descend_into=False):
+            create_symbol_func(symbol_map, soscondata, labeler)
 
-                create_symbol_func(symbol_map, soscondata, labeler)
-
-                level = soscondata.level
-                if (level == 1 and not sos1) or \
-                   (level == 2 and not sos2) or \
-                   (level > 2):
-                    raise ValueError(
-                        "Solver does not support SOS level %s constraints" % (level))
-                if writtenSOS == False:
-                    SOSlines.write("SOS\n")
-                    writtenSOS = True
-                # This updates the referenced_variable_ids, just in case
-                # there is a variable that only appears in an
-                # SOSConstraint, in which case this needs to be known
-                # before we write the "bounds" section (Cplex does not
-                # handle this correctly, Gurobi does)
-                self.printSOS(symbol_map,
-                              labeler,
-                              variable_symbol_map,
-                              soscondata,
-                              SOSlines)
+            level = soscondata.level
+            if (level == 1 and not sos1) or \
+               (level == 2 and not sos2) or \
+               (level > 2):
+                raise ValueError(
+                    "Solver does not support SOS level %s constraints" % (level))
+            if writtenSOS == False:
+                SOSlines.write("SOS\n")
+                writtenSOS = True
+            # This updates the referenced_variable_ids, just in case
+            # there is a variable that only appears in an
+            # SOSConstraint, in which case this needs to be known
+            # before we write the "bounds" section (Cplex does not
+            # handle this correctly, Gurobi does)
+            self.printSOS(symbol_map,
+                          labeler,
+                          variable_symbol_map,
+                          soscondata,
+                          SOSlines)
 
         #
         # Bounds
@@ -777,16 +798,7 @@ class ProblemWriter_cpxlp(AbstractProblemWriter):
         # output their status later.
         integer_vars = []
         binary_vars = []
-        for vardata in variable_list:
-
-            # TODO: We could just loop over the set of items in
-            #       self._referenced_variable_ids, except this is
-            #       a dictionary that is hashed by id(vardata)
-            #       which would make the bounds section
-            #       nondeterministic (bad for unit testing)
-            if (not include_all_variable_bounds) and \
-               (id(vardata) not in self._referenced_variable_ids):
-                continue
+        for vardata in all_variables:
 
             if vardata.fixed:
                 if not output_fixed_variable_bounds:
@@ -860,21 +872,22 @@ class ProblemWriter_cpxlp(AbstractProblemWriter):
         # wrap-up
         #
         output.append("end\n")
-
         output_file.write( "".join(output) )
-        # Clean up the symbol map to only contain variables referenced
-        # in the active constraints **Note**: warm start method may
-        # rely on this for choosing the set of potential warm start
-        # variables
-        vars_to_delete = set(variable_symbol_map.byObject.keys()) - \
-                         set(self._referenced_variable_ids.keys())
-        sm_byObject = symbol_map.byObject
-        sm_bySymbol = symbol_map.bySymbol
-        var_sm_byObject = variable_symbol_map.byObject
-        for varid in vars_to_delete:
-            symbol = var_sm_byObject[varid]
-            del sm_byObject[varid]
-            del sm_bySymbol[symbol]
-        del variable_symbol_map
+
+        if False:
+            # Clean up the symbol map to only contain variables referenced
+            # in the active constraints **Note**: warm start method may
+            # rely on this for choosing the set of potential warm start
+            # variables
+            vars_to_delete = set(variable_symbol_map.byObject.keys()) - \
+                             set(self._referenced_variable_ids.keys())
+            sm_byObject = symbol_map.byObject
+            sm_bySymbol = symbol_map.bySymbol
+            var_sm_byObject = variable_symbol_map.byObject
+            for varid in vars_to_delete:
+                symbol = var_sm_byObject[varid]
+                del sm_byObject[varid]
+                del sm_bySymbol[symbol]
+        #del variable_symbol_map
 
         return symbol_map
