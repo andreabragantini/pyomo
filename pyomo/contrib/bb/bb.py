@@ -1,8 +1,26 @@
-__all__ = ['BBSolver', 'BranchAndBound']
+__all__ = ['BBSolver', 'BranchAndBound', 'SerialBBSolver']
 
 import itertools
 from time import clock
 from heapq import heappush, heappop, heapify
+
+
+class Bunch(dict):
+    """
+    A class that can be used to store a bunch of data dynamically
+
+    foo = Bunch(data=y, sq=y*y, val=2)
+    print foo.data
+    print foo.sq
+    print foo.val
+
+    Adapted from code developed by Alex Martelli and submitted to
+    the ActiveState Programmer Network http://aspn.activestate.com
+    """
+
+    def __init__(self, **kw):
+        dict.__init__(self, kw)
+        self.__dict__.update(kw)
 
 
 class PriorityQueue(object):
@@ -62,7 +80,11 @@ class PriorityQueue(object):
 
     def _remove(self, k):
         'Mark an existing task as None.  Raise KeyError if not found.'
-        self.pq[k] = self.pq.pop()
+        if k == len(self.pq)-1:
+            self.pq.pop()
+        else:
+            self.pq[k] = self.pq.pop()
+
         heapify(self.pq)
 
 
@@ -154,9 +176,12 @@ class BranchAndBound(object):
     __slots__ = ('sense', 'context', 'bound',
                  'solution', 'solution_value')
 
-    def __init__(self, context, sense):
+    def __init__(self, context=None, sense=1):
         self.sense = sense
-        self.context = context
+        if context is None:
+            self.context = Bunch()
+        else:
+            self.context = context
         self.bound = float('-Inf')
         self.solution = None
         self.solution_value = None

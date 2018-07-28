@@ -1,31 +1,11 @@
+###
+### KNAPSACK EXAMPLE
+###
 
 from pyomo.contrib.bb import BranchAndBound
 import re
 import copy
 import math
-
-###
-### KNAPSACK EXAMPLE
-###
-
-
-class Bunch(dict):
-    """
-    A class that can be used to store a bunch of data dynamically
-
-    foo = Bunch(data=y, sq=y*y, val=2)
-    print foo.data
-    print foo.sq
-    print foo.val
-
-    Adapted from code developed by Alex Martelli and submitted to
-    the ActiveState Programmer Network http://aspn.activestate.com
-    """
-
-    def __init__(self, **kw):
-        dict.__init__(self, kw)
-        self.__dict__.update(kw)
-
 
 
 class Knapsack(BranchAndBound):
@@ -33,18 +13,21 @@ class Knapsack(BranchAndBound):
     __slots__ = ('locked_in', 'locked_out', 'last')
 
     def __init__(self, filename=None, names=None, values=None, weights=None, capacity=None, context=None):
+        BranchAndBound.__init__(self, context=context, sense=-1)
         if context is None:
             #
             # Create context
             #
             if not filename is None:
                 capacity, names, weights, values = self.read_file(filename)
-            context = Bunch(names=names, values=values, weights=weights, capacity=capacity)
+            self.context.names = names
+            self.context.values = values
+            self.context.weights = weights
+            self.context.capacity = capacity
             tmp = [values[i]/(1.0*weights[i]) for i in range(len(values))]
-            context.order = [i[0] for i in sorted(enumerate(tmp), key=lambda x:x[1], reverse=True)]
+            self.context.order = [i[0] for i in sorted(enumerate(tmp), key=lambda x:x[1], reverse=True)]
             self.locked_in = set()   # indices into order
             self.locked_out = set()   # indices into order
-        BranchAndBound.__init__(self, context, -1)
         
     def debug(self):
         print("LOCKED IN")
@@ -157,7 +140,7 @@ class Knapsack(BranchAndBound):
 
 
 if __name__ == '__main__':
-    from bb import SerialBBSolver
+    from pyomo.contrib.bb import SerialBBSolver
     #problem = Knapsack(filename='animal1.txt')
     problem = Knapsack(filename='scor-500-1.txt')
     solver = SerialBBSolver()
@@ -165,7 +148,7 @@ if __name__ == '__main__':
     print(value)
     problem.print_solution(solution)
 
-    from pbb import ParallelBBSolver_serial
+    from pyomo.contrib.bb import ParallelBBSolver_serial
     solver = ParallelBBSolver_serial()
     value, solution = solver.solve(problem=problem)
     print(value)

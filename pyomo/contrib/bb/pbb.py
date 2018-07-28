@@ -1,5 +1,5 @@
 
-from bb import PriorityQueue, BBSolver
+from pyomo.contrib.bb.bb import PriorityQueue, BBSolver
 from time import clock, sleep
 import Pyro4
 
