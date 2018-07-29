@@ -6,7 +6,7 @@ from mpi4py.futures import MPICommExecutor
 if __name__ == '__main__':
     import sys
     from pyomo.contrib.bb.knapsack.knapsack import Knapsack
-    from pyomo.contrib.bb import ParallelBBSolver_mpi_synchronize as PBB
+    from pyomo.contrib.bb import ParallelBBSolver_mpi_async as PBB
 
     problem = Knapsack(filename='scor-500-1.txt')
     solver = PBB()

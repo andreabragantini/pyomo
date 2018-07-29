@@ -254,7 +254,10 @@ if mpi_available:
     #
     # Synchronous execution of subproblems with Pyro4
     #
-    class ParallelBBSolver_mpi_synchronize(BBSolver):
+    # NOTE: This class is equivalen to the mpi_async solver with
+    #   greedy=False
+    #
+    class XParallelBBSolver_mpi_synchronize(BBSolver):
 
         def solve(self, **kwds):
             self.executor = kwds.get('executor', None)
@@ -314,6 +317,13 @@ if mpi_available:
                 for i, result in results.items():
                     bound, value, solution, subproblem = result
                     #
+                    # Update incumbent and prune the queue if an improving incumbent has been found
+                    #
+                    if (value is not None) and (sense*value < sense*incumbent_value):
+                        incumbent_value = value
+                        incumbent_solution = solution
+                        queue.prune(incumbent_value - sense*abs_tol)
+                    #
                     # Update nbounded and print diagnostics
                     #
                     nbounded += 1
@@ -321,13 +331,6 @@ if mpi_available:
                         print("#" + str(nbounded) + " pool=" + str(len(queue)) + " inc=" \
                                   + str(incumbent_value) + " bnd=" + str(bound))
                         sys.stdout.flush()
-                    #
-                    # Update incumbent and prune the queue if an improving incumbent has been found
-                    #
-                    if (value is not None) and (sense*value < sense*incumbent_value):
-                        incumbent_value = value
-                        incumbent_solution = solution
-                        queue.prune(incumbent_value - sense*abs_tol)
                     #
                     # Generate children for non-terminal nodes
                     #
@@ -354,6 +357,7 @@ if mpi_available:
 
         def solve(self, **kwds):
             self.executor = kwds.get('executor', None)
+            self.greedy = kwds.get('greedy', False)
             return BBSolver.solve(self, **kwds)
 
         def _solve(self):
@@ -361,6 +365,7 @@ if mpi_available:
             Private interface for solver logic
             """
             start_time = clock()
+            greedy = self.greedy
             comm = MPI.COMM_WORLD
             nworkers = comm.Get_size() - 1
             print("Num Workers %d" % nworkers)
@@ -379,6 +384,7 @@ if mpi_available:
             free = set(list(range(nworkers)))
             handles = {}
             while len(queue) + len(handles) > 0:
+                #assert(len(free) == nworkers)
                 #assert(len(free)+len(handles) == nworkers)
                 #
                 # Send subproblems to workers
@@ -403,7 +409,9 @@ if mpi_available:
                             results.append( handles[i].result() )
                             del handles[i]
                             free.add(i)
-                    if len(results) > 0:
+                    if greedy and len(results) > 0:
+                        break
+                    elif len(handles) == 0:
                         break
                     sleep(0.00001)
                 #
@@ -441,6 +449,7 @@ if mpi_available:
             run_time = clock() - start_time
             print(str(nbounded) + " subproblems bounded")
             print("Run time " + str(run_time) + " seconds")
+            #print("Counts "+str(counts))
             self._incumbent_value = incumbent_value
             self._incumbent_solution = incumbent_solution
             return (incumbent_value, incumbent_solution)

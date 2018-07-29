@@ -13,13 +13,10 @@ if __name__ == '__main__':
 
     rank = MPI.COMM_WORLD.Get_rank()
     size = MPI.COMM_WORLD.Get_size()
-    #print("rank=%d size=%d" % (rank, size))
 
-    #print("FOO")
     with MPICommExecutor(MPI.COMM_WORLD, 0) as executor:
         if executor is not None:
-            #print("RUNNING rank=%d size=%d" % (rank, size))
-            value, solution = solver.solve(problem=problem, executor=executor)
+            value, solution = solver.solve(problem=problem, executor=executor, greedy=True)
             print(value)
             problem.print_solution(solution)
 
