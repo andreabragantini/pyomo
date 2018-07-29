@@ -22,6 +22,12 @@ class Bunch(dict):
         dict.__init__(self, kw)
         self.__dict__.update(kw)
 
+    def __str__(self):
+        state = ["%s=%r" % (attribute, value)
+                 for (attribute, value)
+                 in self.__dict__.items()]
+        return '\n'.join(state)
+
 
 class PriorityQueue(object):
 
@@ -50,7 +56,6 @@ class PriorityQueue(object):
         return heappop(self.pq)[2]
 
     def prune(self, cutoff):
-
         val = self.sense*cutoff
         i = len(self.pq) - 1
         if i<0:
@@ -133,21 +138,25 @@ class SerialBBSolver(BBSolver):
         while len(queue) > 0:
             subproblem = queue.pop()
 
-            if nbounded % 1000 == 0 :
-                print("#" + str(nbounded) + " pool=" + str(len(queue)) + " inc=" \
-                          + str(incumbent_value) + " bnd=" + str(subproblem.bound))
-
             bound = subproblem.compute_bound()
             # print("raw bound: %f" % bound)
             nbounded += 1
+
+            if nbounded % 1000 == 0:
+                print("#" + str(nbounded) + " pool=" + str(len(queue)) + " inc=" \
+                          + str(incumbent_value) + " bnd=" + str(subproblem.bound))
+
             if sense*bound <= sense*incumbent_value:   # TOLERANCE
                 #
                 # Find new incumbent
                 #
                 (value, solution) = subproblem.get_solution()
                 if (not value is None) and (sense*value < sense*incumbent_value):
+                    # New solution has a better value
                     incumbent_value = value
                     incumbent_solution = solution
+                    # Prune conservatively:  use an incumbent value that is slightly worse than
+                    # the true incumbent
                     queue.prune(incumbent_value - sense*abs_tol)
 
                 if sense*bound < sense*incumbent_value - abs_tol and not subproblem.terminal():
@@ -185,6 +194,13 @@ class BranchAndBound(object):
         self.bound = float('-Inf')
         self.solution = None
         self.solution_value = None
+
+    def __getstate__(self):
+        return { slot: getattr(self, slot) for slot in BranchAndBound.__slots__ }
+
+    def __setstate__(self, d):
+        for slot in d:
+            setattr(self, slot, d[slot])
 
     def compute_bound(self):
         """

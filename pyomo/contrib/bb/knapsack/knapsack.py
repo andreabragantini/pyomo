@@ -26,9 +26,21 @@ class Knapsack(BranchAndBound):
             self.context.capacity = capacity
             tmp = [values[i]/(1.0*weights[i]) for i in range(len(values))]
             self.context.order = [i[0] for i in sorted(enumerate(tmp), key=lambda x:x[1], reverse=True)]
-            self.locked_in = set()   # indices into order
-            self.locked_out = set()   # indices into order
+        self.last = None
+        self.locked_in = set()   # indices into order
+        self.locked_out = set()   # indices into order
         
+    def __getstate__(self):
+        d = super(Knapsack, self).__getstate__()
+        for slot in Knapsack.__slots__:
+            d[slot] = getattr(self, slot) 
+        return d
+
+    def __setstate__(self, d):
+        BranchAndBound.__setstate__(self, d)
+        for slot in d:
+            setattr(self, slot, d[slot])
+
     def debug(self):
         print("LOCKED IN")
         print(self.locked_in)
@@ -42,6 +54,8 @@ class Knapsack(BranchAndBound):
         print(self.bound)
         print("LAST")
         print(getattr(self,'last',None))
+        print("CONTEXT")
+        print(self.context)
 
     def read_file(self, filename):
         names=[]
@@ -121,7 +135,7 @@ class Knapsack(BranchAndBound):
         """
         if self.solution is None:
             return (None, None)
-        return (self.solution_value, self.solution    )
+        return (self.solution_value, self.solution)
 
     def print_solution(self, solution):
         for i in sorted(self.context.order[j] for j in solution):
@@ -148,8 +162,8 @@ if __name__ == '__main__':
     print(value)
     problem.print_solution(solution)
 
-    from pyomo.contrib.bb import ParallelBBSolver_serial
-    solver = ParallelBBSolver_serial()
-    value, solution = solver.solve(problem=problem)
-    print(value)
-    problem.print_solution(solution)
+    #from pyomo.contrib.bb import ParallelBBSolver_serial
+    #solver = ParallelBBSolver_serial()
+    #value, solution = solver.solve(problem=problem)
+    #print(value)
+    #problem.print_solution(solution)
