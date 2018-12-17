@@ -959,12 +959,6 @@ class _PHSolverServer(_PHBase):
         if self._initialized is False:
             raise RuntimeError("PH solver server has not been initialized!")
 
-        scenario_tree_object = None
-        if self._scenario_tree.contains_bundles():
-            scenario_tree_object = self._scenario_tree._scenario_bundle_map[object_name]
-        else:
-            scenario_tree_object = self._scenario_tree._scenario_map[object_name]
-
         if module_name in self._modules_imported:
             this_module = self._modules_imported[module_name]
         elif module_name in sys.modules:
@@ -991,7 +985,7 @@ class _PHSolverServer(_PHBase):
         call_objects = None
         if invocation_type == InvocationType.SingleInvocation:
             if self._scenario_tree.contains_bundles():
-                call_objects = (object_name,self._scenario_tree._scenario_bundle_map[object_name])
+                call_objects = (object_name,self._scenario_tree._scenario_to_bundle_map[object_name])
             else:
                 call_objects = (object_name,self._scenario_tree._scenario_map[object_name])
         elif (invocation_type == InvocationType.PerBundleInvocation) or \
@@ -999,7 +993,7 @@ class _PHSolverServer(_PHBase):
             if not self._scenario_tree.contains_bundles():
                 raise ValueError("Received request for bundle invocation type "
                                  "but the scenario tree does not contain bundles.")
-            call_objects = iteritems(self._scenario_tree._scenario_bundle_map)
+            call_objects = iteritems(self._scenario_tree._scenario_to_bundle_map)
         elif (invocation_type == InvocationType.PerScenarioInvocation) or \
              (invocation_type == InvocationType.PerScenarioChainedInvocation):
             call_objects = iteritems(self._scenario_tree._scenario_map)

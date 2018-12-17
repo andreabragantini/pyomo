@@ -787,7 +787,7 @@ def transmit_external_function_invocation_to_worker(
     generate_response = ph._handshake_with_phpyro or return_action_handle
 
     if ph._scenario_tree.contains_bundles():
-        if worker_name not in ph._scenario_tree._scenario_bundle_map:
+        if worker_name not in ph._scenario_tree._bundle_map:
             raise ValueError("PH solver server with name %s does not exist"
                              % (worker_name))
     else:
