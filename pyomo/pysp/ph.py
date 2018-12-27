@@ -3794,8 +3794,10 @@ class ProgressiveHedging(_PHBase):
 
         # determine what needs to be queued
         subproblems_to_queue = []
-        for plugin in self._ph_plugins: # WARNING - BEING SLOPPY - WE SHOULD MAKE SURE WE HAVE ONE LIST RETURNED (MORE THAN ONE PLUGIN CAUSES ISSUES)
-            subproblems_to_queue = plugin.asynchronous_subproblems_to_queue(self)
+        for plugin in self._ph_plugins: # modify Dec 2018 by DLW; now all plugins must have this callback function, but they can return an empty [] (it was worse before and prevented WW extensions and/or made it flaky)
+            QList = plugin.asynchronous_subproblems_to_queue(self)
+            if QList != []:
+                subproblems_to_queue = QList
         assert(len(subproblems_to_queue)!=0)
 
         # in general, we need to track the number of subproblems queued - it may not be,
