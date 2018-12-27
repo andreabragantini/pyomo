@@ -621,7 +621,6 @@ class wwphextension(pyomo.common.plugin.SingletonPlugin):
 
 #==================================================
     def post_iteration_0_solves(self, ph):
-        print ("DLW APH WW extension Debug!!! in post_iteration_0_solves")
         self._iteration_0_called = True
 
         self._collect_variable_bounds(ph)
@@ -756,17 +755,15 @@ class wwphextension(pyomo.common.plugin.SingletonPlugin):
 
 #==================================================
     def post_iteration_0(self, ph):
-
         pass
 
 #==================================================
     def pre_asynchronous_solves(self, ph):
-        print ("DLW Debug!!! in pre_asynchronous_solves")
+        pass
 
 #==================================================
 
     def pre_iteration_k_solves(self, ph):
-        print ("DLW Debug!!! in post_iteration_0_solves")
 
         if (ph._current_iteration == 1) and \
            (not self._iteration_0_called):
@@ -1056,6 +1053,12 @@ class wwphextension(pyomo.common.plugin.SingletonPlugin):
         return []
 #=========================
     def asynchronous_pre_scenario_queue(self, ph, subproblem):
+        pass
+#=========================
+    def post_asynchronous_var_w_update(self, ph, subproblem_buffer, subproblem_solve_counts):
+        pass
+#=========================
+    def post_asynchronous_solves(self, ph):
         pass
 #=========================
     def Int_If_Close_Enough(self, ph, x):
