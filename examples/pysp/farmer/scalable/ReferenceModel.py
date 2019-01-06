@@ -156,7 +156,8 @@ def pysp_instance_creation_callback(scenario_name, node_names):
     model.CostExpressions = pyo.Expression(StageSet, rule=cost_rule)
 
     def total_cost_rule(model):
-        return model.FirstStageCost + model.SecondStageCost
+        # divide by CropsMult to help scaling
+        return (model.FirstStageCost + model.SecondStageCost) / CropsMult
     model.Total_Cost_Objective = pyo.Objective(rule=total_cost_rule, sense=pyo.minimize)
 
     return model
