@@ -985,7 +985,7 @@ class _PHSolverServer(_PHBase):
         call_objects = None
         if invocation_type == InvocationType.SingleInvocation:
             if self._scenario_tree.contains_bundles():
-                call_objects = (object_name,self._scenario_tree._scenario_to_bundle_map[object_name])
+                call_objects = (object_name,self._scenario_tree._bundle_map[object_name])
             else:
                 call_objects = (object_name,self._scenario_tree._scenario_map[object_name])
         elif (invocation_type == InvocationType.PerBundleInvocation) or \
