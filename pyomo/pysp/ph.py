@@ -3881,76 +3881,6 @@ class ProgressiveHedging(_PHBase):
                 for plugin in self._ph_plugins:
                     plugin.post_asynchronous_var_w_update(self, subproblem_buffer, subproblem_solve_counts)
 
-                # we don't want to report stuff and invoke callbacks
-                # after each subproblem solve - wait for when each
-                # subproblem (on average) has reported back a solution.
-                if new_reportable_iteration:
-                    
-                    # let plugins know if they care.
-                    for plugin in self._ph_plugins:
-                        plugin.post_iteration_k_solves(self)
-
-                    # update the fixed variable statistics.
-                    self._total_fixed_discrete_vars,\
-                        self._total_fixed_continuous_vars = \
-                            self.compute_fixed_variable_counts()
-
-                    if self._report_rhos_each_iteration:
-                        print("Async Reportable Iteration Current rhos:")
-                        self.pprint(False, False, False, False, True,
-                                    output_only_statistics=\
-                                    self._report_only_statistic,
-                                    output_only_nonconverged=\
-                                    self._report_only_nonconverged_variables,
-                                    report_stage_costs=False)
-
-                    if self._verbose or self._report_weights:
-                        print("Async Reportable Iteration Current variable "
-                              "averages and weights:")
-                        self.pprint(True, True, False, False, False,
-                                    output_only_statistics=\
-                                    self._report_only_statistics,
-                                    output_only_nonconverged=\
-                                    self._report_only_nonconverged_variables)
-
-                    first_stage_min, first_stage_avg, first_stage_max = \
-                        self._extract_first_stage_cost_statistics()
-                    print("First stage cost avg=%12.4f Max-Min=%8.2f" % (first_stage_avg,
-                                                                         first_stage_max-first_stage_min))
-                    # check for early termination.
-                    for converger in self._convergers:
-                        converger.update(self._current_iteration,
-                                         self,
-                                         self._scenario_tree,
-                                         self._instances)
-
-                    self.printConvergerStatus()
-
-                    expected_cost = self._scenario_tree.findRootNode().computeExpectedNodeCost()
-                    if not _OLD_OUTPUT: print("Expected Cost=%14.4f" % (expected_cost))
-                    self._cost_history[self._current_iteration] = expected_cost
-
-                    if self.is_converged():
-
-                        if (len(self._incumbent_cost_history) == 0) or \
-                           ((self._objective_sense == minimize) and \
-                            (expected_cost < min(self._incumbent_cost_history))) or \
-                           ((self._objective_sense == maximize) and \
-                            (expected_cost > max(self._incumbent_cost_history))):
-                            if not _OLD_OUTPUT: print("Caching results for new incumbent solution")
-                            self.cacheSolutions(self._incumbent_cache_id)
-                            self._best_incumbent_key = self._current_iteration
-                        self._incumbent_cost_history[self._current_iteration] = expected_cost
-
-                        plugin_convergence = True
-                        for plugin in self._ph_plugins:
-                            if hasattr(plugin,"ph_convergence_check"):
-                                if not plugin.ph_convergence_check(self):
-                                    plugin_convergence = False
-
-                        if plugin_convergence:
-                            break
-
                 # see if we've exceeded our patience with the
                 # iteration limit.  changed to be based on the average
                 # on July 10, 2011 by dlw (really, it should be some
@@ -4034,6 +3964,76 @@ class ProgressiveHedging(_PHBase):
 
                 # this is not a speed issue, is there a memory issue?
                 subproblem_buffer = []
+
+            # we don't want to report stuff and invoke callbacks
+            # after each subproblem solve - wait for when each
+            # subproblem (on average) has reported back a solution.
+            if new_reportable_iteration:
+
+                # let plugins know if they care.
+                for plugin in self._ph_plugins:
+                    plugin.post_iteration_k_solves(self)
+
+                # update the fixed variable statistics.
+                self._total_fixed_discrete_vars,\
+                    self._total_fixed_continuous_vars = \
+                        self.compute_fixed_variable_counts()
+
+                if self._report_rhos_each_iteration:
+                    print("Async Reportable Iteration Current rhos:")
+                    self.pprint(False, False, False, False, True,
+                                output_only_statistics=\
+                                self._report_only_statistic,
+                                output_only_nonconverged=\
+                                self._report_only_nonconverged_variables,
+                                report_stage_costs=False)
+
+                if self._verbose or self._report_weights:
+                    print("Async Reportable Iteration Current variable "
+                          "averages and weights:")
+                    self.pprint(True, True, False, False, False,
+                                output_only_statistics=\
+                                self._report_only_statistics,
+                                output_only_nonconverged=\
+                                self._report_only_nonconverged_variables)
+
+                first_stage_min, first_stage_avg, first_stage_max = \
+                    self._extract_first_stage_cost_statistics()
+                print("First stage cost avg=%12.4f Max-Min=%8.2f" % (first_stage_avg,
+                                                                     first_stage_max-first_stage_min))
+                # check for early termination.
+                for converger in self._convergers:
+                    converger.update(self._current_iteration,
+                                     self,
+                                     self._scenario_tree,
+                                     self._instances)
+
+                self.printConvergerStatus()
+
+                expected_cost = self._scenario_tree.findRootNode().computeExpectedNodeCost()
+                if not _OLD_OUTPUT: print("Expected Cost=%14.4f" % (expected_cost))
+                self._cost_history[self._current_iteration] = expected_cost
+
+                if self.is_converged():
+
+                    if (len(self._incumbent_cost_history) == 0) or \
+                       ((self._objective_sense == minimize) and \
+                        (expected_cost < min(self._incumbent_cost_history))) or \
+                       ((self._objective_sense == maximize) and \
+                        (expected_cost > max(self._incumbent_cost_history))):
+                        if not _OLD_OUTPUT: print("Caching results for new incumbent solution")
+                        self.cacheSolutions(self._incumbent_cache_id)
+                        self._best_incumbent_key = self._current_iteration
+                    self._incumbent_cost_history[self._current_iteration] = expected_cost
+
+                    plugin_convergence = True
+                    for plugin in self._ph_plugins:
+                        if hasattr(plugin,"ph_convergence_check"):
+                            if not plugin.ph_convergence_check(self):
+                                plugin_convergence = False
+
+                    if plugin_convergence:
+                        break
 
 #            print("-----------------------------")
 
