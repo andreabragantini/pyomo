@@ -3255,10 +3255,8 @@ class ProgressiveHedging(_PHBase):
                         result_load_times.append(end_time-start_time)
 
                 if self._verbose:
-                    print("Successfully loaded solution for scenario=%s "
-                          "- waiting on %d more"
-                          % (scenario_name,
-                             len(self._scenario_tree._scenarios) - num_results_so_far))
+                    print("Successfully loaded solution for scenario=%s " % 
+                          scenario_name)
 
         if self._output_times:
             mean = sum(result_load_times) / float(len(result_load_times))
@@ -3826,7 +3824,6 @@ class ProgressiveHedging(_PHBase):
         print("Entering PH asynchronous processing loop")
 
         while(True):
-
 #            print("-----------------------------")
 #            print("TOP OF ASYNC PH LOOP")
 #            print("QUEUED SOLVE ACTION HANDLES=",self._queued_solve_action_handles)
@@ -3867,8 +3864,6 @@ class ProgressiveHedging(_PHBase):
 
             subproblem_buffer.append(solved_subproblem_name)
 
-#            print("SOLVED SUBPROBLEM BUFFER=",subproblem_buffer)
-
             if len(subproblem_buffer) == self._async_buffer_length:
                 if self._verbose:
                     print("")
@@ -3890,7 +3885,7 @@ class ProgressiveHedging(_PHBase):
                 # after each subproblem solve - wait for when each
                 # subproblem (on average) has reported back a solution.
                 if new_reportable_iteration:
-
+                    
                     # let plugins know if they care.
                     for plugin in self._ph_plugins:
                         plugin.post_iteration_k_solves(self)
@@ -4026,13 +4021,13 @@ class ProgressiveHedging(_PHBase):
                         print("PH Iteration Count (computed)=%s"
                               % (self._current_iteration))
 
-                    if self._verbose:
-                        print("Variable values following scenario solves:")
-                        self.pprint(False, False, True, False, False,
-                                    output_only_statistics=\
+                if self._verbose:
+                    print("Variable values following scenario solves:")
+                    self.pprint(False, False, True, False, False,
+                                output_only_statistics=\
                                     self._report_only_statistics,
-                                    output_only_nonconverged=\
-                                        self._report_only_nonconverged_variables)
+                                output_only_nonconverged=\
+                                    self._report_only_nonconverged_variables)
 
                 if self._verbose is True:
                     print("Emptying the asynch scenario buffer.")
